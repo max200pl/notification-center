@@ -1,6 +1,13 @@
-# React + TypeScript + Vite
+# Notification Center
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A notification center project built with React + TypeScript + Vite, featuring a dynamic HTML template builder.
+
+## Features
+
+- **React + TypeScript + Vite** - Modern development setup with HMR
+- **HTML Template Builder** - Dynamic, type-safe notification templates
+- **Sciter Integration** - Ready for native bridge communication
+- **Multi-language Support** - Built-in i18n for notifications
 
 Currently, two official plugins are available:
 
@@ -71,3 +78,62 @@ export default defineConfig([
   },
 ])
 ```
+
+---
+
+## HTML Template Builder
+
+Dynamic, type-safe HTML template builder for creating customizable notification templates.
+
+### Quick Start
+
+```typescript
+import { HtmlTemplateBuilder } from './src/lib/htmlTemplateBuilder';
+
+// Simple example
+const html = new HtmlTemplateBuilder()
+  .setTitle('My Notification')
+  .setSubtitle('This is a subtitle')
+  .setColors({ cardBackground: '#f0f0f0' })
+  .build();
+```
+
+### Presets
+
+```typescript
+// Dark theme
+const html = HtmlTemplateBuilder.createDarkTheme()
+  .setTitle('Dark Mode')
+  .build();
+
+// Minimal
+const html = HtmlTemplateBuilder.createMinimal()
+  .setTitle('Simple Alert')
+  .build();
+```
+
+### Demo
+
+```bash
+npm run demo
+```
+
+Opens an interactive browser demo with live examples.
+
+### Documentation
+
+- **[Quick Start Guide](README_TEMPLATE_BUILDER.md)** - Basic usage and examples
+- **[Full Documentation](docs/HTML_TEMPLATE_BUILDER.md)** - Complete API reference
+- **[Usage Examples](src/lib/examples.ts)** - 11 real-world examples
+- **[Advanced Patterns](src/lib/usage-example.ts)** - 7 advanced patterns
+- **[Summary](SUMMARY.md)** - Implementation overview
+
+### Features
+
+- ✅ Fluent API with method chaining
+- ✅ Type-safe configuration
+- ✅ Multiple presets (Dark, Minimal, Compact)
+- ✅ Full i18n support
+- ✅ Sciter bridge integration
+- ✅ Interactive demo
+- ✅ Extensive documentation

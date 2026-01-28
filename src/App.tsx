@@ -1,8 +1,8 @@
 import "./App.css";
-import { HtmlBuilderPage } from "./components/ HtmlBuilderPage";
+import { BuilderSwitcher } from "./components/BuilderSwitcher";
 
 function App() {
-  return <HtmlBuilderPage />;
+  return <BuilderSwitcher />;
 }
 
 export default App;

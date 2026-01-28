@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HTML Template Builder Demo</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+    .demo-container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    .demo-header {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .demo-header h1 {
+      margin: 0 0 10px;
+      color: #333;
+    }
+    .demo-header p {
+      margin: 0;
+      color: #666;
+    }
+    .demo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 20px;
+    }
+    .demo-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .demo-card h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      color: #333;
+    }
+    .demo-card .description {
+      margin: 0 0 15px;
+      color: #666;
+      font-size: 14px;
+    }
+    .demo-card iframe {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .code-toggle {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      margin-bottom: 10px;
+    }
+    .code-toggle:hover {
+      background: #0056b3;
+    }
+    .code-container {
+      display: none;
+      background: #f8f8f8;
+      padding: 15px;
+      border-radius: 4px;
+      margin-bottom: 15px;
+      overflow-x: auto;
+    }
+    .code-container.visible {
+      display: block;
+    }
+    .code-container pre {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <div class="demo-header">
+      <h1>🎨 HTML Template Builder Demo</h1>
+      <p>Interactive examples of dynamically generated notification templates</p>
+    </div>
+
+    <div class="demo-grid" id="demoGrid"></div>
+  </div>
+
+  <script type="module">
+    // Mock jsBridgeCall for demo
+    window.jsBridgeCall = async (method, payload) => {
+      console.log('Bridge call:', method, payload);
+      return { success: true };
+    };
+
+    // Template builder (simplified version for demo)
+    class HtmlTemplateBuilder {
+      constructor() {
+        this.config = {
+          width: 450,
+          minHeight: 420,
+          colors: {
+            background: 'transparent',
+            cardBackground: 'white',
+            textColor: 'black',
+            subtitleColor: '#333',
+            borderColor: '#ddd',
+            buttonBg: '#f0f0f0',
+            buttonBorder: '#ccc',
+            badgeBg: '#efefef',
+            dotColorActive: '#10b04a',
+            dotColorDanger: '#ff3b30',
+            debugBg: '#f6f6f6',
+          },
+          title: 'Notification Title',
+          subtitle: 'Notification subtitle',
+          badge: { show: true, label: 'Counter' },
+          buttons: [
+            { id: 'switchLang', label: 'Switch language' },
+            { id: 'applyPayload', label: 'Apply payload' },
+            { id: 'closeWebview', label: 'Close WebView' },
+            { id: 'cta', label: 'CTA', action: 'cta_click' },
+          ],
+          showDebugArea: true,
+          defaultLang: 'en',
+          i18n: {
+            en: { title: 'Program removed: {programName}', subtitle: 'Leftover files: {count}', counter: 'Live counter', switch: 'Switch language' },
+            uk: { title: 'Програму видалено: {programName}', subtitle: 'Залишкових файлів: {count}', counter: 'Лічильник', switch: 'Змінити мову' },
+          },
+          initialPayload: { programName: 'WinZip', count: 12 },
+          counterInterval: 1000,
+        };
+      }
+
+      setDimensions(width, minHeight) { this.config.width = width; this.config.minHeight = minHeight; return this; }
+      setColors(colors) { Object.assign(this.config.colors, colors); return this; }
+      setTitle(title) { this.config.title = title; return this; }
+      setSubtitle(subtitle) { this.config.subtitle = subtitle; return this; }
+      setBadge(badge) { Object.assign(this.config.badge, badge); return this; }
+      setButtons(buttons) { this.config.buttons = buttons; return this; }
+      showDebugArea(show) { this.config.showDebugArea = show; return this; }
+
+      build() {
+        const { colors, width, minHeight, title, subtitle, badge, buttons, showDebugArea, defaultLang, i18n, initialPayload, counterInterval } = this.config;
+
+        const badgeHTML = badge.show ? `
+          <div class="badge">
+            <span class="dot" id="dot"></span>
+            <span id="counterLabel">${badge.label || ''}</span>
+            <b id="counter">0</b>
+          </div>` : '';
+
+        const buttonRows = [];
+        for (let i = 0; i < buttons.length; i += 2) {
+          buttonRows.push(buttons.slice(i, i + 2));
+        }
+        const buttonsHTML = buttonRows.map(row =>
+          `<div class="row">${row.map(btn => `<button id="${btn.id}">${btn.label}</button>`).join('')}</div>`
+        ).join('');
+
+        return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Template</title>
+  <style>
+    html, body { font-family: system-ui; background: ${colors.background}; color: ${colors.textColor}; margin: 0; padding: 0; overflow: hidden; }
+    .card { border: 1px solid ${colors.borderColor}; border-radius: 12px; padding: 16px; color: ${colors.textColor}; width: ${width}px; min-height: ${minHeight}px; background: ${colors.cardBackground}; display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; }
+    .row { display: flex; gap: 10px; flex-wrap: wrap; }
+    button { padding: 10px 12px; border-radius: 10px; cursor: pointer; background: ${colors.buttonBg}; border: 1px solid ${colors.buttonBorder}; color: ${colors.textColor}; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 999px; background: ${colors.badgeBg}; font-size: 12px; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; background: ${colors.dotColorActive}; }
+    .title { margin: 0; color: ${colors.textColor}; }
+    .subtitle { margin: 0; font-size: 14px; color: ${colors.subtitleColor}; }
+    pre { background: ${colors.debugBg}; padding: 10px; border-radius: 10px; white-space: pre-wrap; font-size: 12px; overflow: auto; box-sizing: border-box; flex: none; max-height: 120px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3 class="title" id="header">${title}</h3>
+    ${badgeHTML}
+    <p class="subtitle" id="subtitle">${subtitle}</p>
+    ${buttonsHTML}
+    ${showDebugArea ? '<pre id="out"></pre>' : ''}
+  </div>
+  <script>
+    const state = { lang: "${defaultLang}", ticks: 0, payload: ${JSON.stringify(initialPayload)}, i18n: ${JSON.stringify(i18n)} };
+    const t = (key) => state.i18n[state.lang]?.[key] ?? state.i18n.en?.[key] ?? key;
+    const fmt = (str) => String(str).replace(/\\{(\\w+)\\}/g, (_, k) => state.payload[k] ?? "");
+
+    function render() {
+      document.getElementById("header").textContent = fmt(t("title"));
+      document.getElementById("subtitle").textContent = fmt(t("subtitle"));
+      const counterLabel = document.getElementById("counterLabel");
+      if (counterLabel) counterLabel.textContent = t("counter");
+      const switchBtn = document.getElementById("switchLang");
+      if (switchBtn) switchBtn.textContent = t("switch");
+      const dot = document.getElementById("dot");
+      if (dot) dot.style.background = state.payload.count > 20 ? "${colors.dotColorDanger}" : "${colors.dotColorActive}";
+    }
+
+    const counter = document.getElementById("counter");
+    if (counter) {
+      setInterval(() => {
+        state.ticks++;
+        counter.textContent = state.ticks;
+        const dot = document.getElementById("dot");
+        if (dot) dot.style.opacity = state.ticks % 2 ? "0.5" : "1";
+      }, ${counterInterval});
+    }
+
+    const switchLangBtn = document.getElementById("switchLang");
+    if (switchLangBtn) {
+      switchLangBtn.onclick = () => {
+        const langs = Object.keys(state.i18n);
+        const idx = langs.indexOf(state.lang);
+        state.lang = langs[(idx + 1) % langs.length];
+        render();
+      };
+    }
+
+    window.addEventListener("load", render);
+  </script>
+</body>
+</html>`;
+      }
+
+      static createDarkTheme() {
+        return new HtmlTemplateBuilder().setColors({
+          background: 'transparent',
+          cardBackground: '#1a1a1a',
+          textColor: '#ffffff',
+          subtitleColor: '#cccccc',
+          borderColor: '#333333',
+          buttonBg: '#2a2a2a',
+          buttonBorder: '#444444',
+          badgeBg: '#2a2a2a',
+          debugBg: '#0a0a0a',
+        });
+      }
+
+      static createMinimal() {
+        return new HtmlTemplateBuilder()
+          .showDebugArea(false)
+          .setButtons([{ id: 'cta', label: 'OK', action: 'cta_click' }])
+          .setBadge({ show: false });
+      }
+    }
+
+    // Demo examples
+    const examples = [
+      {
+        title: 'Default Template',
+        description: 'Standard configuration with all features enabled',
+        code: `new HtmlTemplateBuilder().build()`,
+        builder: new HtmlTemplateBuilder(),
+      },
+      {
+        title: 'Dark Theme',
+        description: 'Pre-configured dark color scheme',
+        code: `HtmlTemplateBuilder.createDarkTheme()
+  .setTitle('Dark Mode Notification')
+  .build()`,
+        builder: HtmlTemplateBuilder.createDarkTheme()
+          .setTitle('Dark Mode Notification'),
+      },
+      {
+        title: 'Minimal',
+        description: 'Clean template with single button',
+        code: `HtmlTemplateBuilder.createMinimal()
+  .setTitle('Simple Alert')
+  .setSubtitle('Click OK to continue')
+  .build()`,
+        builder: HtmlTemplateBuilder.createMinimal()
+          .setTitle('Simple Alert')
+          .setSubtitle('Click OK to continue'),
+      },
+      {
+        title: 'Custom Colors',
+        description: 'Branded theme with gradient background',
+        code: `new HtmlTemplateBuilder()
+  .setTitle('WinZip Cleaner')
+  .setColors({
+    cardBackground: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+    textColor: '#ffffff',
+    subtitleColor: 'rgba(255, 255, 255, 0.8)',
+  })
+  .build()`,
+        builder: new HtmlTemplateBuilder()
+          .setTitle('WinZip Cleaner')
+          .setSubtitle('System optimization in progress')
+          .setColors({
+            cardBackground: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            textColor: '#ffffff',
+            subtitleColor: 'rgba(255, 255, 255, 0.8)',
+            borderColor: 'rgba(255, 255, 255, 0.2)',
+            buttonBg: 'rgba(255, 255, 255, 0.2)',
+            buttonBorder: 'rgba(255, 255, 255, 0.3)',
+          })
+          .showDebugArea(false),
+      },
+      {
+        title: 'Custom Buttons',
+        description: 'Custom action buttons configuration',
+        code: `new HtmlTemplateBuilder()
+  .setButtons([
+    { id: 'save', label: 'Save', action: 'save' },
+    { id: 'delete', label: 'Delete', action: 'delete' },
+    { id: 'archive', label: 'Archive', action: 'archive' },
+  ])
+  .build()`,
+        builder: new HtmlTemplateBuilder()
+          .setTitle('File Management')
+          .setSubtitle('Choose an action')
+          .setButtons([
+            { id: 'save', label: 'Save', action: 'save' },
+            { id: 'delete', label: 'Delete', action: 'delete' },
+            { id: 'archive', label: 'Archive', action: 'archive' },
+            { id: 'close', label: 'Close', action: 'close' },
+          ])
+          .showDebugArea(false),
+      },
+      {
+        title: 'Success Theme',
+        description: 'Green success notification',
+        code: `new HtmlTemplateBuilder()
+  .setColors({
+    cardBackground: '#d4edda',
+    borderColor: '#28a745',
+    textColor: '#155724',
+  })
+  .build()`,
+        builder: new HtmlTemplateBuilder()
+          .setTitle('Success!')
+          .setSubtitle('Operation completed successfully')
+          .setColors({
+            cardBackground: '#d4edda',
+            borderColor: '#28a745',
+            textColor: '#155724',
+            subtitleColor: '#155724',
+            buttonBg: '#c3e6cb',
+            buttonBorder: '#28a745',
+          })
+          .setButtons([{ id: 'ok', label: 'OK', action: 'confirm' }])
+          .setBadge({ show: false })
+          .showDebugArea(false),
+      },
+    ];
+
+    // Render demos
+    const grid = document.getElementById('demoGrid');
+    examples.forEach((example, index) => {
+      const card = document.createElement('div');
+      card.className = 'demo-card';
+
+      const html = example.builder.build();
+
+      card.innerHTML = `
+        <h2>${example.title}</h2>
+        <p class="description">${example.description}</p>
+        <button class="code-toggle" onclick="toggleCode(${index})">Show Code</button>
+        <div class="code-container" id="code-${index}">
+          <pre><code>${example.code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
+        </div>
+        <iframe srcdoc="${html.replace(/"/g, '&quot;')}"></iframe>
+      `;
+
+      grid.appendChild(card);
+    });
+
+    window.toggleCode = (index) => {
+      const codeContainer = document.getElementById(`code-${index}`);
+      const button = codeContainer.previousElementSibling;
+      codeContainer.classList.toggle('visible');
+      button.textContent = codeContainer.classList.contains('visible') ? 'Hide Code' : 'Show Code';
+    };
+  </script>
+</body>
+</html>

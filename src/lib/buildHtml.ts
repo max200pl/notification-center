@@ -1,4 +1,5 @@
 import type { NotificationModel } from "./types";
+import { HtmlTemplateBuilder, buildHtmlTemplate } from "./htmlTemplateBuilder";
 
 function escapeHtml(s: string) {
   return s
@@ -70,3 +71,9 @@ export function buildHtml(model: NotificationModel) {
 </body>
 </html>`;
 }
+
+// Export default template (can be regenerated with custom config)
+export const templateHtml = new HtmlTemplateBuilder().build();
+
+// Export builder and utility functions
+export { HtmlTemplateBuilder, buildHtmlTemplate };
