@@ -1,5 +1,11 @@
-import type { NotificationModel } from "./types";
 import { HtmlTemplateBuilder, buildHtmlTemplate } from "./htmlTemplateBuilder";
+
+type NotificationModel = {
+  title: string;
+  message: string;
+  buttonText: string;
+  theme: "light" | "dark";
+};
 
 function escapeHtml(s: string) {
   return s

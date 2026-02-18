@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { HtmlTemplateBuilder } from '../lib/htmlTemplateBuilder';
 
 type ThemeType = 'light' | 'dark' | 'minimal' | 'success' | 'error';

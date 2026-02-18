@@ -5,7 +5,7 @@ export type NotificationModel = {
   theme: "light" | "dark";
 };
 
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { buildHtml } from "../lib/buildHtml";
 
 function downloadHtml(filename: string, html: string) {

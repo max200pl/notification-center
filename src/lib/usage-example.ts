@@ -58,7 +58,7 @@ export class NotificationFactory {
     type: NotificationType,
     title: string,
     subtitle: string,
-    customConfig?: Partial<TemplateConfig>
+    _customConfig?: Partial<TemplateConfig>
   ): string {
     const theme = this.THEMES[type];
 
