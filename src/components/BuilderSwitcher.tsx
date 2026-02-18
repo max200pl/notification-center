@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { SimpleBuilderPage } from './SimpleBuilderPage';
 import { AdvancedHtmlBuilderPage } from './AdvancedHtmlBuilderPage';
+import { ChatNowBuilderPage } from './ChatNowBuilderPage';
 
-type ViewMode = 'simple' | 'advanced';
+type ViewMode = 'simple' | 'advanced' | 'chatnow';
 
 export function BuilderSwitcher() {
   const [mode, setMode] = useState<ViewMode>('simple');
@@ -94,12 +95,41 @@ export function BuilderSwitcher() {
           >
             ⚙️ Advanced
           </button>
+          <button
+            onClick={() => setMode('chatnow')}
+            style={{
+              padding: '10px 20px',
+              borderRadius: 8,
+              border: 'none',
+              background: mode === 'chatnow' ? 'white' : 'transparent',
+              color: mode === 'chatnow' ? '#667eea' : 'white',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 14,
+              transition: 'all 0.2s',
+              boxShadow: mode === 'chatnow' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+            }}
+            onMouseOver={(e) => {
+              if (mode !== 'chatnow') {
+                e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (mode !== 'chatnow') {
+                e.currentTarget.style.background = 'transparent';
+              }
+            }}
+          >
+            💬 Chat Now
+          </button>
         </div>
       </div>
 
       {/* Content */}
       <div style={{ flex: 1, overflow: 'hidden' }}>
-        {mode === 'simple' ? <SimpleBuilderPage /> : <AdvancedHtmlBuilderPage />}
+        {mode === 'simple' && <SimpleBuilderPage />}
+        {mode === 'advanced' && <AdvancedHtmlBuilderPage />}
+        {mode === 'chatnow' && <ChatNowBuilderPage />}
       </div>
     </div>
   );

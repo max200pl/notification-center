@@ -13,6 +13,27 @@ function downloadHtml(filename: string, html: string) {
   URL.revokeObjectURL(url);
 }
 
+function savePositionsToJson(buttons: any[], elementPositions: any) {
+  const positions = {
+    buttons: buttons.map(btn => ({
+      id: btn.id,
+      label: btn.label,
+      position: btn.position,
+    })),
+    elements: elementPositions,
+    timestamp: new Date().toISOString(),
+  };
+
+  const json = JSON.stringify(positions, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'element-positions.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export function AdvancedHtmlBuilderPage() {
   const [preset, setPreset] = useState<PresetType>('default');
   const [title, setTitle] = useState('Program removed: WinZip');
@@ -22,6 +43,7 @@ export function AdvancedHtmlBuilderPage() {
   const [showBadge, setShowBadge] = useState(true);
   const [showDebugArea, setShowDebugArea] = useState(true);
   const [language, setLanguage] = useState('en');
+  const [globalDragMode, setGlobalDragMode] = useState(false);
 
   const [customColors, setCustomColors] = useState<TemplateColors>({
     cardBackground: '#ffffff',
@@ -36,7 +58,15 @@ export function AdvancedHtmlBuilderPage() {
     { id: 'cta', label: 'CTA', action: 'cta_click', position: { x: 200, y: 70 } },
   ]);
 
-  // Listen for button position updates from iframe
+  // Store positions for all elements in global drag mode
+  const [elementPositions, setElementPositions] = useState({
+    header: { x: 10, y: 10 },
+    badgeElement: { x: 10, y: 50 },
+    subtitle: { x: 10, y: 90 },
+    out: { x: 10, y: 400 },
+  });
+
+  // Listen for position updates from iframe
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'buttonPositionsUpdate') {
@@ -47,6 +77,28 @@ export function AdvancedHtmlBuilderPage() {
             position: positions[btn.id] || btn.position || { x: 0, y: 0 },
           }))
         );
+      }
+
+      if (event.data?.type === 'elementPositionsUpdate') {
+        const positions = event.data.positions;
+
+        // Update button positions
+        if (positions.buttons) {
+          setButtons((prevButtons) =>
+            prevButtons.map((btn) => ({
+              ...btn,
+              position: positions.buttons[btn.id] || btn.position || { x: 0, y: 0 },
+            }))
+          );
+        }
+
+        // Update other element positions
+        if (positions.elements) {
+          setElementPositions((prev) => ({
+            ...prev,
+            ...positions.elements,
+          }));
+        }
       }
     };
 
@@ -115,7 +167,9 @@ export function AdvancedHtmlBuilderPage() {
       .setDimensions(width, minHeight)
       .setBadge({ show: showBadge })
       .showDebugArea(showDebugArea)
-      .setDefaultLang(language);
+      .setDefaultLang(language)
+      .setGlobalDragMode(globalDragMode)
+      .setElementPositions(elementPositions);
 
     // Apply buttons if not minimal preset
     if (preset !== 'minimal') {
@@ -123,7 +177,7 @@ export function AdvancedHtmlBuilderPage() {
     }
 
     return builder.build();
-  }, [preset, title, subtitle, width, minHeight, showBadge, showDebugArea, language, customColors, buttons]);
+  }, [preset, title, subtitle, width, minHeight, showBadge, showDebugArea, language, customColors, buttons, globalDragMode, elementPositions]);
 
   return (
     <div style={{ display: 'flex', height: '100%', padding: 24, gap: 24, background: '#f5f7fa' }}>
@@ -324,6 +378,7 @@ export function AdvancedHtmlBuilderPage() {
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             gap: 12,
             padding: '16px',
             background: '#f9fafb',
@@ -331,50 +386,100 @@ export function AdvancedHtmlBuilderPage() {
             border: '1px solid #e5e7eb',
           }}
         >
+          <div style={{ display: 'flex', gap: 12 }}>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 12px',
+                background: 'white',
+                borderRadius: 8,
+                cursor: 'pointer',
+                flex: 1,
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showBadge}
+                onChange={(e) => setShowBadge(e.target.checked)}
+                style={{ cursor: 'pointer', width: 16, height: 16 }}
+              />
+              Show Badge
+            </label>
+            <label
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                padding: '8px 12px',
+                background: 'white',
+                borderRadius: 8,
+                cursor: 'pointer',
+                flex: 1,
+                fontSize: 14,
+                fontWeight: 500,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={showDebugArea}
+                onChange={(e) => setShowDebugArea(e.target.checked)}
+                style={{ cursor: 'pointer', width: 16, height: 16 }}
+              />
+              Show Debug
+            </label>
+          </div>
           <label
             style={{
               display: 'flex',
               alignItems: 'center',
               gap: 10,
-              padding: '8px 12px',
-              background: 'white',
+              padding: '10px 14px',
+              background: globalDragMode ? 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)' : 'white',
               borderRadius: 8,
               cursor: 'pointer',
-              flex: 1,
               fontSize: 14,
-              fontWeight: 500,
+              fontWeight: 600,
+              border: globalDragMode ? '2px solid #667eea' : '1px solid #e5e7eb',
+              transition: 'all 0.2s',
             }}
           >
             <input
               type="checkbox"
-              checked={showBadge}
-              onChange={(e) => setShowBadge(e.target.checked)}
+              checked={globalDragMode}
+              onChange={(e) => setGlobalDragMode(e.target.checked)}
               style={{ cursor: 'pointer', width: 16, height: 16 }}
             />
-            Show Badge
+            <span style={{ color: globalDragMode ? '#4338ca' : '#374151' }}>
+              🎯 Global Drag Mode (All Elements)
+            </span>
           </label>
-          <label
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              padding: '8px 12px',
-              background: 'white',
-              borderRadius: 8,
-              cursor: 'pointer',
-              flex: 1,
-              fontSize: 14,
-              fontWeight: 500,
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={showDebugArea}
-              onChange={(e) => setShowDebugArea(e.target.checked)}
-              style={{ cursor: 'pointer', width: 16, height: 16 }}
-            />
-            Show Debug
-          </label>
+          {globalDragMode && (
+            <div
+              style={{
+                padding: '10px 12px',
+                background: '#fef3c7',
+                borderRadius: 6,
+                border: '1px solid #fbbf24',
+                fontSize: 12,
+                color: '#92400e',
+                lineHeight: 1.5,
+              }}
+            >
+              <strong>💡 Tip:</strong> In Global Drag Mode, all elements (title, subtitle, badge, buttons, debug area) can be dragged anywhere. Press <kbd style={{
+                background: '#fff',
+                padding: '2px 6px',
+                borderRadius: 3,
+                border: '1px solid #d97706',
+                fontFamily: 'monospace',
+                fontSize: 11,
+                fontWeight: 600
+              }}>G</kbd> to toggle grid snap.
+            </div>
+          )}
         </div>
 
         {/* Language */}
@@ -520,27 +625,28 @@ export function AdvancedHtmlBuilderPage() {
           </details>
         )}
 
-        {/* Buttons Configuration */}
-        <details
-          open
-          style={{
-            background: '#f9fafb',
-            padding: '16px',
-            borderRadius: 12,
-            border: '1px solid #e5e7eb',
-          }}
-        >
-          <summary
+        {/* Buttons Configuration - hide in global drag mode */}
+        {!globalDragMode && (
+          <details
+            open
             style={{
-              fontWeight: 600,
-              cursor: 'pointer',
-              marginBottom: 16,
-              fontSize: 14,
-              color: '#374151',
+              background: '#f9fafb',
+              padding: '16px',
+              borderRadius: 12,
+              border: '1px solid #e5e7eb',
             }}
           >
-            🔘 Buttons Library ({buttons.length})
-          </summary>
+            <summary
+              style={{
+                fontWeight: 600,
+                cursor: 'pointer',
+                marginBottom: 16,
+                fontSize: 14,
+                color: '#374151',
+              }}
+            >
+              🔘 Buttons Library ({buttons.length})
+            </summary>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {buttons.map((btn, index) => (
               <div
@@ -682,9 +788,10 @@ export function AdvancedHtmlBuilderPage() {
             ))}
           </div>
         </details>
+        )}
 
         {/* Reset button for draggable buttons */}
-        {hasDraggableButtons && (
+        {!globalDragMode && hasDraggableButtons && (
           <button
             onClick={() => {
               setButtons((prevButtons) =>
@@ -717,31 +824,101 @@ export function AdvancedHtmlBuilderPage() {
         )}
 
         {/* Actions */}
-        <button
-          onClick={() => downloadHtml('notification.html', html)}
-          style={{
-            padding: '14px 20px',
-            borderRadius: 12,
-            border: 'none',
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            color: 'white',
-            cursor: 'pointer',
-            fontWeight: 600,
-            fontSize: 15,
-            boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
-            transition: 'transform 0.2s, box-shadow 0.2s',
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.transform = 'translateY(-2px)';
-            e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.transform = 'translateY(0)';
-            e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
-          }}
-        >
-          💾 Download HTML
-        </button>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <button
+            onClick={() => downloadHtml('notification.html', html)}
+            style={{
+              padding: '14px 20px',
+              borderRadius: 12,
+              border: 'none',
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              cursor: 'pointer',
+              fontWeight: 600,
+              fontSize: 15,
+              boxShadow: '0 4px 12px rgba(102, 126, 234, 0.4)',
+              transition: 'transform 0.2s, box-shadow 0.2s',
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.transform = 'translateY(-2px)';
+              e.currentTarget.style.boxShadow = '0 6px 16px rgba(102, 126, 234, 0.5)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(102, 126, 234, 0.4)';
+            }}
+          >
+            💾 Download HTML
+          </button>
+
+          {globalDragMode && (
+            <>
+              <button
+                onClick={() => savePositionsToJson(buttons, elementPositions)}
+                style={{
+                  padding: '14px 20px',
+                  borderRadius: 12,
+                  border: '2px solid #10b981',
+                  background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+                  color: '#065f46',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 15,
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  transition: 'transform 0.2s, box-shadow 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 6px 16px rgba(16, 185, 129, 0.4)';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(16, 185, 129, 0.3)';
+                }}
+              >
+                📥 Save Positions (JSON)
+              </button>
+
+              <button
+                onClick={() => {
+                  // Reset all element positions to defaults
+                  setElementPositions({
+                    header: { x: 10, y: 10 },
+                    badgeElement: { x: 10, y: 50 },
+                    subtitle: { x: 10, y: 90 },
+                    out: { x: 10, y: 400 },
+                  });
+                  // Reset button positions
+                  setButtons((prevButtons) =>
+                    prevButtons.map((btn, index) => ({
+                      ...btn,
+                      position: { x: 10 + (index % 2) * 200, y: 140 + Math.floor(index / 2) * 50 },
+                    }))
+                  );
+                }}
+                style={{
+                  padding: '12px 18px',
+                  borderRadius: 10,
+                  border: '2px solid #f59e0b',
+                  background: '#fff7ed',
+                  color: '#b45309',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  fontSize: 14,
+                  transition: 'all 0.2s',
+                }}
+                onMouseOver={(e) => {
+                  e.currentTarget.style.background = '#fed7aa';
+                }}
+                onMouseOut={(e) => {
+                  e.currentTarget.style.background = '#fff7ed';
+                }}
+              >
+                🔄 Reset All Positions
+              </button>
+            </>
+          )}
+        </div>
 
         <details
           style={{
@@ -813,29 +990,36 @@ export function AdvancedHtmlBuilderPage() {
         </div>
 
         {/* Drag mode info banner */}
-        {hasDraggableButtons && (
+        {(globalDragMode || hasDraggableButtons) && (
           <div
             style={{
               padding: '14px 18px',
-              background: 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
+              background: globalDragMode
+                ? 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)'
+                : 'linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%)',
               borderRadius: 12,
-              border: '2px solid #667eea',
+              border: globalDragMode ? '2px solid #f59e0b' : '2px solid #667eea',
               display: 'flex',
               alignItems: 'center',
               gap: 12,
             }}
           >
-            <span style={{ fontSize: 24 }}>🎯</span>
+            <span style={{ fontSize: 24 }}>{globalDragMode ? '🌍' : '🎯'}</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, color: '#4338ca', fontSize: 14 }}>
-                {buttons.filter(b => b.draggable).length} Draggable Button{buttons.filter(b => b.draggable).length > 1 ? 's' : ''}
+              <div style={{ fontWeight: 600, color: globalDragMode ? '#92400e' : '#4338ca', fontSize: 14 }}>
+                {globalDragMode
+                  ? '🎯 Global Drag Mode Active - All Elements Draggable'
+                  : `${buttons.filter(b => b.draggable).length} Draggable Button${buttons.filter(b => b.draggable).length > 1 ? 's' : ''}`}
               </div>
-              <div style={{ fontSize: 12, color: '#6366f1', marginTop: 2 }}>
-                Drag buttons anywhere in the template • Press <kbd style={{
+              <div style={{ fontSize: 12, color: globalDragMode ? '#b45309' : '#6366f1', marginTop: 2 }}>
+                {globalDragMode
+                  ? 'Drag any element (title, subtitle, badge, buttons, debug) anywhere • Press '
+                  : 'Drag buttons anywhere in the template • Press '}
+                <kbd style={{
                   background: '#fff',
                   padding: '2px 6px',
                   borderRadius: 4,
-                  border: '1px solid #6366f1',
+                  border: globalDragMode ? '1px solid #f59e0b' : '1px solid #6366f1',
                   fontFamily: 'monospace',
                   fontSize: 11,
                   fontWeight: 600

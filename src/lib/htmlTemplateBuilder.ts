@@ -32,6 +32,13 @@ export interface I18nDictionary {
   };
 }
 
+export interface ElementPositions {
+  header?: { x: number; y: number };
+  badgeElement?: { x: number; y: number };
+  subtitle?: { x: number; y: number };
+  out?: { x: number; y: number };
+}
+
 export interface TemplateConfig {
   // Dimensions
   width?: number;
@@ -54,6 +61,10 @@ export interface TemplateConfig {
   i18n?: I18nDictionary;
   initialPayload?: Record<string, any>;
   counterInterval?: number;
+
+  // Drag and drop
+  globalDragMode?: boolean;
+  elementPositions?: ElementPositions;
 }
 
 export class HtmlTemplateBuilder {
@@ -109,6 +120,13 @@ export class HtmlTemplateBuilder {
     },
     initialPayload: { programName: 'WinZip', count: 12 },
     counterInterval: 1000,
+    globalDragMode: false,
+    elementPositions: {
+      header: { x: 10, y: 10 },
+      badgeElement: { x: 10, y: 50 },
+      subtitle: { x: 10, y: 90 },
+      out: { x: 10, y: 400 },
+    },
   };
 
   setDimensions(width: number, minHeight: number): this {
@@ -177,6 +195,16 @@ export class HtmlTemplateBuilder {
     return this;
   }
 
+  setGlobalDragMode(enabled: boolean): this {
+    this.config.globalDragMode = enabled;
+    return this;
+  }
+
+  setElementPositions(positions: Partial<ElementPositions>): this {
+    this.config.elementPositions = { ...this.config.elementPositions, ...positions };
+    return this;
+  }
+
   updateButtonPositions(positions: Record<string, { x: number; y: number }>): this {
     this.config.buttons = this.config.buttons.map(btn => ({
       ...btn,
@@ -186,7 +214,7 @@ export class HtmlTemplateBuilder {
   }
 
   private generateStyles(): string {
-    const { colors, width, minHeight } = this.config;
+    const { colors, width, minHeight, globalDragMode } = this.config;
 
     return `
       html,
@@ -207,11 +235,18 @@ export class HtmlTemplateBuilder {
         width: ${width}px;
         min-height: ${minHeight}px;
         background: ${colors.cardBackground};
-        display: flex;
-        flex-direction: column;
-        gap: 10px;
+        ${globalDragMode ? 'position: relative;' : 'display: flex; flex-direction: column; gap: 10px;'}
         box-sizing: border-box;
       }
+
+      ${globalDragMode ? `
+      .card.grid-visible {
+        background-image:
+          repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(102, 126, 234, 0.2) 19px, rgba(102, 126, 234, 0.2) 20px),
+          repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(102, 126, 234, 0.2) 19px, rgba(102, 126, 234, 0.2) 20px);
+        background-size: 20px 20px;
+      }
+      ` : ''}
 
       .row {
         display: flex;
@@ -262,6 +297,29 @@ export class HtmlTemplateBuilder {
         z-index: 100;
       }
 
+      ${globalDragMode ? `
+      .draggable-element {
+        position: absolute;
+        cursor: move;
+        transition: box-shadow 0.2s;
+        z-index: 1;
+        user-select: none;
+      }
+
+      .draggable-element:hover {
+        box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        outline: 2px dashed rgba(102, 126, 234, 0.4);
+        outline-offset: 4px;
+        z-index: 10;
+      }
+
+      .draggable-element.dragging {
+        opacity: 0.8;
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+        z-index: 100;
+      }
+      ` : ''}
+
       .badge {
         display: inline-flex;
         align-items: center;
@@ -305,9 +363,23 @@ export class HtmlTemplateBuilder {
   }
 
   private generateButtonsHTML(): string {
-    const { buttons } = this.config;
+    const { buttons, globalDragMode } = this.config;
 
     if (!buttons.length) return '';
+
+    // Global drag mode: all buttons are draggable
+    if (globalDragMode) {
+      return buttons
+        .map((btn, index) => {
+          // Use saved position if exists, otherwise calculate default
+          let pos = btn.position;
+          if (!pos || (pos.x === undefined && pos.y === undefined)) {
+            pos = { x: 10 + (index % 2) * 200, y: 140 + Math.floor(index / 2) * 50 };
+          }
+          return `      <button id="${btn.id}" class="draggable-element" data-x="${pos.x}" data-y="${pos.y}" style="position: absolute; left: ${pos.x}px; top: ${pos.y}px;">${btn.label}</button>`;
+        })
+        .join('\n');
+    }
 
     // Check if any button has draggable enabled
     const hasDraggable = buttons.some(btn => btn.draggable);
@@ -344,6 +416,14 @@ export class HtmlTemplateBuilder {
 
   private generateBadgeHTML(): string {
     if (!this.config.badge.show) return '';
+
+    if (this.config.globalDragMode) {
+      // Return only inner content for global drag mode
+      return `
+        <span class="dot" id="dot"></span>
+        <span id="counterLabel">${this.config.badge.label || ''}</span>
+        <b id="counter">0</b>`;
+    }
 
     return `
       <div class="badge">
@@ -496,50 +576,165 @@ export class HtmlTemplateBuilder {
       let draggedElement = null;
       let offsetX = 0;
       let offsetY = 0;
-      let snapToGrid = true; // Enable snap by default
+      let snapToGrid = ${this.config.globalDragMode ? 'true' : 'true'}; // Enable snap by default
       const gridSize = 20; // Grid size in pixels
+      const isGlobalDragMode = ${this.config.globalDragMode ? 'true' : 'false'};
 
       function initDragAndDrop() {
-        const draggableButtons = document.querySelectorAll('button.draggable');
-        const container = document.getElementById('buttonsContainer');
+        const card = document.getElementById('mainCard') || document.querySelector('.card');
 
-        if (!container) return;
+        if (isGlobalDragMode) {
+          // Global drag mode: all elements with draggable-element class
+          const draggableElements = document.querySelectorAll('.draggable-element');
 
-        // Show grid by default when draggable buttons exist
-        if (draggableButtons.length > 0) {
-          container.classList.add('grid-visible');
-        }
-
-        // Toggle grid visibility with 'G' key
-        document.addEventListener('keydown', (e) => {
-          if (e.key.toLowerCase() === 'g' && draggableButtons.length > 0) {
-            snapToGrid = !snapToGrid;
-            container.classList.toggle('grid-visible');
-            log('Grid snap: ' + (snapToGrid ? 'ON' : 'OFF'));
+          if (draggableElements.length > 0 && card) {
+            card.classList.add('grid-visible');
           }
-        });
 
-        draggableButtons.forEach(button => {
-          button.addEventListener('mousedown', (e) => {
-            e.preventDefault();
-            draggedElement = button;
-
-            const rect = button.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-
-            offsetX = e.clientX - rect.left;
-            offsetY = e.clientY - rect.top;
-
-            button.classList.add('dragging');
-
-            document.addEventListener('mousemove', onMouseMove);
-            document.addEventListener('mouseup', onMouseUp);
+          // Toggle grid visibility with 'G' key
+          document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'g' && card) {
+              snapToGrid = !snapToGrid;
+              card.classList.toggle('grid-visible');
+              log('Grid snap: ' + (snapToGrid ? 'ON' : 'OFF'));
+            }
           });
-        });
+
+          draggableElements.forEach(element => {
+            element.addEventListener('mousedown', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              draggedElement = element;
+
+              const rect = element.getBoundingClientRect();
+              const cardRect = card.getBoundingClientRect();
+
+              offsetX = e.clientX - rect.left;
+              offsetY = e.clientY - rect.top;
+
+              element.classList.add('dragging');
+
+              document.addEventListener('mousemove', onMouseMoveGlobal);
+              document.addEventListener('mouseup', onMouseUpGlobal);
+            });
+          });
+        } else {
+          // Original drag mode for buttons only
+          const draggableButtons = document.querySelectorAll('button.draggable');
+          const container = document.getElementById('buttonsContainer');
+
+          if (!container) return;
+
+          // Show grid by default when draggable buttons exist
+          if (draggableButtons.length > 0) {
+            container.classList.add('grid-visible');
+          }
+
+          // Toggle grid visibility with 'G' key
+          document.addEventListener('keydown', (e) => {
+            if (e.key.toLowerCase() === 'g' && draggableButtons.length > 0) {
+              snapToGrid = !snapToGrid;
+              container.classList.toggle('grid-visible');
+              log('Grid snap: ' + (snapToGrid ? 'ON' : 'OFF'));
+            }
+          });
+
+          draggableButtons.forEach(button => {
+            button.addEventListener('mousedown', (e) => {
+              e.preventDefault();
+              draggedElement = button;
+
+              const rect = button.getBoundingClientRect();
+              const containerRect = container.getBoundingClientRect();
+
+              offsetX = e.clientX - rect.left;
+              offsetY = e.clientY - rect.top;
+
+              button.classList.add('dragging');
+
+              document.addEventListener('mousemove', onMouseMove);
+              document.addEventListener('mouseup', onMouseUp);
+            });
+          });
+        }
       }
 
       function snapToGridValue(value) {
         return Math.round(value / gridSize) * gridSize;
+      }
+
+      function onMouseMoveGlobal(e) {
+        if (!draggedElement) return;
+
+        const card = document.getElementById('mainCard') || document.querySelector('.card');
+        if (!card) return;
+
+        const cardRect = card.getBoundingClientRect();
+
+        // Calculate position relative to card
+        let x = e.clientX - cardRect.left - offsetX;
+        let y = e.clientY - cardRect.top - offsetY;
+
+        // Apply snap to grid if enabled
+        if (snapToGrid) {
+          x = snapToGridValue(x);
+          y = snapToGridValue(y);
+        }
+
+        // Constrain to card boundaries with padding
+        const maxX = cardRect.width - draggedElement.offsetWidth - 20;
+        const maxY = cardRect.height - draggedElement.offsetHeight - 20;
+
+        x = Math.max(10, Math.min(x, maxX));
+        y = Math.max(10, Math.min(y, maxY));
+
+        draggedElement.style.left = x + 'px';
+        draggedElement.style.top = y + 'px';
+
+        // Store position in data attributes
+        draggedElement.dataset.x = x;
+        draggedElement.dataset.y = y;
+      }
+
+      function onMouseUpGlobal(e) {
+        if (!draggedElement) return;
+
+        draggedElement.classList.remove('dragging');
+
+        log('Element ' + draggedElement.id + ' moved to: x=' + draggedElement.dataset.x + ', y=' + draggedElement.dataset.y);
+
+        // Collect all element positions and send to parent
+        const elementPositions = {};
+        const buttonPositions = {};
+
+        document.querySelectorAll('.draggable-element').forEach(el => {
+          const pos = {
+            x: parseFloat(el.dataset.x) || 0,
+            y: parseFloat(el.dataset.y) || 0,
+          };
+
+          // Separate buttons from other elements
+          if (el.tagName.toLowerCase() === 'button') {
+            buttonPositions[el.id] = pos;
+          } else {
+            elementPositions[el.id] = pos;
+          }
+        });
+
+        // Post message to parent window
+        if (window.parent !== window) {
+          window.parent.postMessage({
+            type: 'elementPositionsUpdate',
+            positions: {
+              buttons: buttonPositions,
+              elements: elementPositions,
+            },
+          }, '*');
+        }
+
+        draggedElement = null;
+        document.removeEventListener('mousemove', onMouseMoveGlobal);
+        document.removeEventListener('mouseup', onMouseUpGlobal);
       }
 
       function onMouseMove(e) {
@@ -655,6 +850,41 @@ ${buttonHandlers}
     const buttonsHTML = this.generateButtonsHTML();
     const debugArea = this.config.showDebugArea ? '<pre id="out"></pre>' : '';
     const script = this.generateScript();
+
+    if (this.config.globalDragMode) {
+      // Global drag mode: all elements are absolutely positioned with saved positions
+      const headerPos = this.config.elementPositions.header || { x: 10, y: 10 };
+      const badgePos = this.config.elementPositions.badgeElement || { x: 10, y: 50 };
+      const subtitlePos = this.config.elementPositions.subtitle || { x: 10, y: this.config.badge.show ? 90 : 50 };
+      const debugPos = this.config.elementPositions.out || { x: 10, y: 400 };
+
+      return `
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Template</title>
+
+    <style>
+      ${styles}
+    </style>
+  </head>
+
+  <body>
+    <div class="card" id="mainCard">
+      <h3 class="title draggable-element" id="header" data-x="${headerPos.x}" data-y="${headerPos.y}" style="position: absolute; left: ${headerPos.x}px; top: ${headerPos.y}px;">${this.config.title}</h3>
+${badgeHTML ? `      <div class="badge draggable-element" id="badgeElement" data-x="${badgePos.x}" data-y="${badgePos.y}" style="position: absolute; left: ${badgePos.x}px; top: ${badgePos.y}px;">${badgeHTML.trim()}</div>` : ''}
+      <p class="subtitle draggable-element" id="subtitle" data-x="${subtitlePos.x}" data-y="${subtitlePos.y}" style="position: absolute; left: ${subtitlePos.x}px; top: ${subtitlePos.y}px;">${this.config.subtitle}</p>
+${buttonsHTML}
+      ${debugArea ? `<pre id="out" class="draggable-element" data-x="${debugPos.x}" data-y="${debugPos.y}" style="position: absolute; left: ${debugPos.x}px; top: ${debugPos.y}px; max-width: calc(100% - 40px);"></pre>` : ''}
+    </div>
+
+    <script>
+      ${script}
+    </script>
+  </body>
+</html>
+`.trim();
+    }
 
     return `
 <html>

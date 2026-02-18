@@ -374,7 +374,7 @@
         <div class="code-container" id="code-${index}">
           <pre><code>${example.code.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</code></pre>
         </div>
-        <iframe srcdoc="${html.replace(/"/g, '&quot;')}"></iframe>
+        <iframe srcdoc="${html.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/"/g, '&quot;')}"></iframe>
       `;
 
       grid.appendChild(card);
